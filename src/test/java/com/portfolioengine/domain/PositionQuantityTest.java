@@ -71,5 +71,15 @@ public class PositionQuantityTest {
         assertDoesNotThrow( () -> pos.subtract(quantity));
     }
 
+    @Test
+    public void shouldConsiderPositionQuantityFromQuantity() {
+        PositionQuantity positionQuantity = PositionQuantity.from(new Quantity(new BigDecimal("3")));
+        assertEquals(new BigDecimal("3"), positionQuantity.quantity());
+    }
+
+    @Test
+    public void shouldRejectNullquantityFromMethod() {
+        assertThrows(NullPointerException.class, ()-> PositionQuantity.from(null));
+    }
 
 }

@@ -21,4 +21,9 @@ public record PositionQuantity(BigDecimal quantity) {
         Objects.requireNonNull(newQuantity, "quantity");
         return new PositionQuantity(quantity.subtract(newQuantity.quantity()));
     }
+
+    public static PositionQuantity from(Quantity quantity) {
+        Objects.requireNonNull(quantity, "quantity");
+        return new PositionQuantity(quantity.quantity());
+    }
 }
