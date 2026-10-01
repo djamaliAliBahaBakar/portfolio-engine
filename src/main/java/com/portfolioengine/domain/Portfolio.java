@@ -37,6 +37,22 @@ public final class Portfolio {
 
     }
 
+    public void apply(Sell sell) {
+        Objects.requireNonNull(sell);
+        Position currentPosition = findPosition(sell.ticker()).orElseThrow( 
+            () -> new IllegalArgumentException("Position with ticker" + sell.ticker().value() + " not found"));
 
+
+        Position position = new Position(
+            currentPosition.ticker(),
+            currentPosition.quantity().subtract(sell.quantity())
+        );
+        
+        if (position.quantity().isZero()) {
+            positions.remove(currentPosition.ticker());
+        } else {
+            positions.put(sell.ticker(), position);
+        }
+    }
    
 }

@@ -26,4 +26,8 @@ public record PositionQuantity(BigDecimal quantity) {
         Objects.requireNonNull(quantity, "quantity");
         return new PositionQuantity(quantity.quantity());
     }
+
+    public boolean isZero() {
+        return (new PositionQuantity(new BigDecimal("0")).equals(this));
+    }
 }
