@@ -3,6 +3,8 @@ package com.portfolioengine.domain;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Currency;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -111,7 +113,7 @@ public class PortfolioTest {
 
         Quantity quantitySell = new Quantity(new BigDecimal("20"));
         Sell sell = new Sell(ticker, quantitySell, price, LocalDate.now());
-        assertThrows(IllegalArgumentException.class, () -> portfolio.apply(sell));
+        assertThrows(InsufficientPositionException.class, () -> portfolio.apply(sell));
         Position position = portfolio.findPosition(ticker).get();
         assertEquals(new PositionQuantity(new BigDecimal("10")), position.quantity());
     }
@@ -121,9 +123,120 @@ public class PortfolioTest {
         Portfolio portfolio = new Portfolio();
         Quantity quantitySell = new Quantity(new BigDecimal("20"));
         Sell sell = new Sell(new  Ticker("GOOG"), quantitySell, new Price(new BigDecimal("2"), Currency.getInstance("EUR")), LocalDate.now());
-        assertThrows(IllegalArgumentException.class, ()-> portfolio.apply(sell));
+        assertThrows(PositionNotFoundException.class, ()-> portfolio.apply(sell));
     }
-}
 
+    @Test
+    public void shouldConsiderEmptyPortfolioWhenGetTikers() {
+        Portfolio portfolio = new Portfolio();
+        List<Ticker> tickers = portfolio.tickers();
+        assertEquals(0, tickers.size());
+    }
+
+    @Test
+    public void shouldConsiderListTickerForPortfolio() {
+        Portfolio portfolio = new Portfolio();
+        Ticker ticker1 = new Ticker("AAPL");
+        Quantity quantity1 = new Quantity(new BigDecimal("10"));
+        Price price1 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy1 = new Buy(ticker1, quantity1, price1, LocalDate.now());
+        portfolio.apply(buy1);
+
+        Ticker ticker2 = new Ticker("MSFT");
+        Quantity quantity2 = new Quantity(new BigDecimal("30"));
+        Price price2 = new Price(new BigDecimal("4"), Currency.getInstance("USD"));
+        Buy buy2 = new Buy(ticker2, quantity2, price2, LocalDate.now());
+        portfolio.apply(buy2);
+
+        Ticker ticker3 = new Ticker("GOOG");
+        Quantity quantity3 = new Quantity(new BigDecimal("20"));
+        Price price3 = new Price(new BigDecimal("3"), Currency.getInstance("EUR"));
+        Buy buy3 = new Buy(ticker3, quantity3, price3, LocalDate.now());
+        portfolio.apply(buy3);
+
+        List<Ticker> tickers = portfolio.tickers();
+        assertEquals(List.of(ticker1, ticker3, ticker2), tickers);
+    }
+
+    @Test
+    public void shouldConsiderTransactionsByTickerForValidBuyTransaction() {
+        Portfolio portfolio = new Portfolio();
+        Ticker ticker1 = new Ticker("AAPL");
+        Quantity quantity1 = new Quantity(new BigDecimal("10"));
+        Price price1 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy1 = new Buy(ticker1, quantity1, price1, LocalDate.now());
+        portfolio.apply(buy1);
+
+        Ticker ticker2 = new Ticker("MSFT");
+        Quantity quantity2 = new Quantity(new BigDecimal("30"));
+        Price price2 = new Price(new BigDecimal("4"), Currency.getInstance("EUR"));
+        Buy buy2 = new Buy(ticker2, quantity2, price2, LocalDate.now());
+        portfolio.apply(buy2);
+
+        Ticker ticker3 = new Ticker("AAPL");
+        Quantity quantity3 = new Quantity(new BigDecimal("20"));
+        Price price3 = new Price(new BigDecimal("3"), Currency.getInstance("EUR"));
+        Buy buy3 = new Buy(ticker3, quantity3, price3, LocalDate.now());
+        portfolio.apply(buy3);
+
+        Map<Ticker, List<TransactionAssociatedToTicker>> transactionsByTicker = portfolio.transactionsByTicker();
+        assertEquals(List.of(buy1, buy3), transactionsByTicker.get(ticker1));
+        assertEquals(List.of(buy2), transactionsByTicker.get(ticker2));
+    }
+
+    @Test
+    public void shouldConsiderTransactionsByTickerForValidSellTransaction() {
+        Portfolio portfolio = new Portfolio();
+        Ticker ticker1 = new Ticker("AAPL");
+        Quantity quantity1 = new Quantity(new BigDecimal("10"));
+        Price price1 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy1 = new Buy(ticker1, quantity1, price1, LocalDate.now());
+        portfolio.apply(buy1);
+
+        Ticker ticker2 = new Ticker("MSFT");
+        Quantity quantity2 = new Quantity(new BigDecimal("30"));
+        Price price2 = new Price(new BigDecimal("4"), Currency.getInstance("EUR"));
+        Buy buy2 = new Buy(ticker2, quantity2, price2, LocalDate.now());
+        portfolio.apply(buy2);
+
+        Ticker ticker3 = new Ticker("AAPL");
+        Quantity quantity3 = new Quantity(new BigDecimal("7"));
+        Price price3 = new Price(new BigDecimal("3"), Currency.getInstance("EUR"));
+        Sell sell = new Sell(ticker3, quantity3, price3, LocalDate.now());
+        portfolio.apply(sell);
+
+        Map<Ticker, List<TransactionAssociatedToTicker>> transactionsByTicker = portfolio.transactionsByTicker();
+        assertEquals(List.of(buy1, sell), transactionsByTicker.get(ticker1));
+        assertEquals(List.of(buy2), transactionsByTicker.get(ticker2));
+    }
+
+    @Test
+    public void shouldConsiderTransactionsByTickerForInvalidSellTransaction() {
+        Portfolio portfolio = new Portfolio();
+        Ticker ticker1 = new Ticker("AAPL");
+        Quantity quantity1 = new Quantity(new BigDecimal("10"));
+        Price price1 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy1 = new Buy(ticker1, quantity1, price1, LocalDate.now());
+        portfolio.apply(buy1);
+
+        Ticker ticker2 = new Ticker("MSFT");
+        Quantity quantity2 = new Quantity(new BigDecimal("30"));
+        Price price2 = new Price(new BigDecimal("4"), Currency.getInstance("EUR"));
+        Buy buy2 = new Buy(ticker2, quantity2, price2, LocalDate.now());
+        portfolio.apply(buy2);
+
+        Ticker ticker3 = new Ticker("AAPL");
+        Quantity quantity3 = new Quantity(new BigDecimal("20"));
+        Price price3 = new Price(new BigDecimal("3"), Currency.getInstance("EUR"));
+        Sell sell = new Sell(ticker3, quantity3, price3, LocalDate.now());
+        assertThrows(InsufficientPositionException.class, () -> portfolio.apply(sell));
+
+        Map<Ticker, List<TransactionAssociatedToTicker>> transactionsByTicker = portfolio.transactionsByTicker();
+        assertEquals(List.of(buy1), transactionsByTicker.get(ticker1));
+        assertEquals(List.of(buy2), transactionsByTicker.get(ticker2));
+    }
+
+    
+}
 
 
