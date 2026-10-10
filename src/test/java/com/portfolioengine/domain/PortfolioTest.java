@@ -6,6 +6,11 @@ import java.util.Currency;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -113,9 +118,12 @@ public class PortfolioTest {
 
         Quantity quantitySell = new Quantity(new BigDecimal("20"));
         Sell sell = new Sell(ticker, quantitySell, price, LocalDate.now());
-        assertThrows(InsufficientPositionException.class, () -> portfolio.apply(sell));
+        InsufficientPositionException exception = assertThrows(InsufficientPositionException.class, () -> portfolio.apply(sell));
         Position position = portfolio.findPosition(ticker).get();
         assertEquals(new PositionQuantity(new BigDecimal("10")), position.quantity());
+        assertEquals(ticker, exception.getTicker());
+        assertEquals(quantitySell.quantity(), exception.getRequested());
+        assertEquals(quantity.quantity(), exception.getAvailable());
     }
 
     @Test
@@ -234,6 +242,66 @@ public class PortfolioTest {
         Map<Ticker, List<TransactionAssociatedToTicker>> transactionsByTicker = portfolio.transactionsByTicker();
         assertEquals(List.of(buy1), transactionsByTicker.get(ticker1));
         assertEquals(List.of(buy2), transactionsByTicker.get(ticker2));
+    }
+
+    @Test
+    void shouldApplyConcurrentBuysWithoutLostUpdate() throws Exception {
+        Portfolio portfolio = new Portfolio();
+
+        Ticker ticker = new Ticker("AAPL");
+
+
+        Quantity quantity1 = new Quantity(new BigDecimal("10"));
+        Price price1 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy1 = new Buy(ticker, quantity1, price1, LocalDate.now());
+        portfolio.apply(buy1);
+
+        ExecutorService executors = Executors.newFixedThreadPool(2);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        // TODO créer buy5 et buy3
+        Quantity quantity2 = new Quantity(new BigDecimal("5"));
+        Price price2 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy5 = new Buy(ticker, quantity2, price2, LocalDate.now());
+  
+
+        Quantity quantity3 = new Quantity(new BigDecimal("3"));
+        Price price3 = new Price(new BigDecimal("2"), Currency.getInstance("EUR"));
+        Buy buy3 = new Buy(ticker, quantity3, price3, LocalDate.now());
+   
+
+        // TODO soumettre task1
+        Callable<Void> task1 = () -> {
+            ready.countDown();
+            start.await();
+            portfolio.apply(buy3);
+            return null;
+        };
+
+        Future<Void> future1 = executors.submit(task1);
+
+
+        Callable<Void> task2 = () -> {
+            ready.countDown();
+            start.await();
+            portfolio.apply(buy5);
+            return null;
+        };
+
+        Future<Void> future2 = executors.submit(task2);
+
+        ready.await();
+        start.countDown();
+        future1.get();
+        future2.get();
+
+
+        Position position = portfolio.findPosition(ticker).get();
+        assertTrue(new BigDecimal("18").compareTo(position.quantity().quantity()) == 0);
+
+        executors.shutdown();
     }
 
     

@@ -20,27 +20,32 @@ public final class Portfolio {
         transactions = new ArrayList<>();
     }
 
-    public Optional<Position> findPosition(Ticker ticker) {
+    public synchronized Optional<Position> findPosition(Ticker ticker) {
         return Optional.ofNullable(positions.get(ticker));
     }
+
     public void apply(Buy buy) {
         Objects.requireNonNull(buy);
-        Optional<Position> pos = findPosition(buy.ticker());
-
-        Position position;
-        if (pos.isPresent()) {
-            Position currentPosition = pos.get();
-
-            position = new Position(
-                currentPosition.ticker(),
-                currentPosition.quantity().add(buy.quantity())
-            );
+       synchronized (this) {
             
-        } else {
-            position = new Position(buy.ticker(), PositionQuantity.from(buy.quantity()));
-       }
-        transactions.add(buy);
-        positions.put(buy.ticker(), position);
+
+            Optional<Position> pos = findPosition(buy.ticker());
+
+            Position position;
+            if (pos.isPresent()) {
+                Position currentPosition = pos.get();
+
+                position = new Position(
+                    currentPosition.ticker(),
+                    currentPosition.quantity().add(buy.quantity())
+                );
+                
+            } else {
+                position = new Position(buy.ticker(), PositionQuantity.from(buy.quantity()));
+        }
+            transactions.add(buy);
+            positions.put(buy.ticker(), position);
+        }
 
 
     }
@@ -53,7 +58,7 @@ public final class Portfolio {
 
 
         if (sell.quantity().quantity().compareTo(currentPosition.quantity().quantity()) > 0) {
-            throw new InsufficientPositionException("Sell quantity " + sell.quantity() + " greater than current position quanity :"+ currentPosition.quantity().quantity());
+            throw new InsufficientPositionException(sell.ticker(), sell.quantity().quantity(), currentPosition.quantity().quantity());
         }
         
         Position position = new Position(
@@ -69,14 +74,14 @@ public final class Portfolio {
         transactions.add(sell);
     }
 
-    public List<Ticker> tickers() {
+    public synchronized List<Ticker> tickers() {
         return positions.values()
             .stream().map(position -> position.ticker())
             .sorted(Comparator.comparing(Ticker::value))
             .toList();
     }
 
-    public Map<Ticker, List<TransactionAssociatedToTicker>> transactionsByTicker() {
+    public synchronized Map<Ticker, List<TransactionAssociatedToTicker>> transactionsByTicker() {
         return transactions.stream()
             .filter(transaction -> transaction instanceof TransactionAssociatedToTicker)
             .map( t -> (TransactionAssociatedToTicker)t)

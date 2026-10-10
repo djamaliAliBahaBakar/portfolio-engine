@@ -18,7 +18,7 @@ public class CashImpactCalculator {
                 dividend.money();
 
             case Fee fee ->
-                fee.money().negate();
+                fee.money().negate(); 
         };
     }
 
