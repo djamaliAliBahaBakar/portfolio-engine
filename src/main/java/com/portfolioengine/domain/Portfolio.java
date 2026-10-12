@@ -53,25 +53,29 @@ public final class Portfolio {
     public void apply(Sell sell) {
         Objects.requireNonNull(sell);
 
-        Position currentPosition = findPosition(sell.ticker()).orElseThrow( 
+        synchronized (this) {
+             Position currentPosition = findPosition(sell.ticker()).orElseThrow( 
             () -> new PositionNotFoundException(sell.ticker()));
 
 
-        if (sell.quantity().quantity().compareTo(currentPosition.quantity().quantity()) > 0) {
-            throw new InsufficientPositionException(sell.ticker(), sell.quantity().quantity(), currentPosition.quantity().quantity());
+            if (sell.quantity().quantity().compareTo(currentPosition.quantity().quantity()) > 0) {
+                throw new InsufficientPositionException(sell.ticker(), sell.quantity().quantity(), currentPosition.quantity().quantity());
+            }
+            
+            Position position = new Position(
+                currentPosition.ticker(),
+                currentPosition.quantity().subtract(sell.quantity())
+            );
+            
+            if (position.quantity().isZero()) {
+                positions.remove(currentPosition.ticker());
+            } else {
+                positions.put(sell.ticker(), position);
+            }
+            transactions.add(sell);
         }
-        
-        Position position = new Position(
-            currentPosition.ticker(),
-            currentPosition.quantity().subtract(sell.quantity())
-        );
-        
-        if (position.quantity().isZero()) {
-            positions.remove(currentPosition.ticker());
-        } else {
-            positions.put(sell.ticker(), position);
-        }
-        transactions.add(sell);
+
+       
     }
 
     public synchronized List<Ticker> tickers() {
@@ -87,6 +91,10 @@ public final class Portfolio {
             .map( t -> (TransactionAssociatedToTicker)t)
             .collect(Collectors.groupingBy(TransactionAssociatedToTicker::ticker));
 
+    }
+
+    public synchronized List<Position> positions() {
+        return List.copyOf(positions.values());
     }
    
 }

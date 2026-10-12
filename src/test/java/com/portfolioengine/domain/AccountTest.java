@@ -19,7 +19,7 @@ public class AccountTest {
         Account accountB = new Account(2, 1000);
 
         // À compléter
-        ExecutorService executors = executors = Executors.newFixedThreadPool(2);
+        ExecutorService executors =Executors.newFixedThreadPool(2);
         try {
             
             CountDownLatch ready = new CountDownLatch(2);
